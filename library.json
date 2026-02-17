@@ -1,0 +1,21 @@
+{
+  "name": "HT600",
+  "version": "1.0.0",
+  "description": "High-performance FSM Trinary Decoder for HT680/HT600/HT6207 series. Hardware-agnostic design with custom tick resolution.",
+  "keywords": "RF, decoder, HT680, HT600, HT6207, remote control, 433MHz, trinary, FSM",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/initialChris/HT600.git"
+  },
+  "authors": [
+    {
+      "name": "Christian Caroleo",
+      "email": "christiancaroleo.se@gmail.com",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*",
+  "examples": "examples/*/*.ino"
+}
