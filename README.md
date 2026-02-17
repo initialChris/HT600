@@ -113,7 +113,7 @@ HT600 decoder(HT680_330K_FOSC, 0.3f, 1, 50);
 // 2. Interrupt Service Routine
 void IRAM_ATTR handleInterrupt() {
     // Feed the decoder with state and timestamp
-    decoder.processEvent(digitalRead(RF_PIN), micros());
+    decoder.handleInterrupt(digitalRead(RF_PIN), micros());
 }
 
 void setup() {
@@ -127,14 +127,14 @@ void loop() {
     if (decoder.getState() == HT600_STATE::DONE) {
         
         // Get Data (Mapping Z to 0)
-        uint16_t data = decoder.get_data_16bit(false);
+        uint16_t data = decoder.getReceivedValue();
         // Get Z-Mask (1 where the bit is Floating/Open)
-        uint16_t z_mask = decoder.get_Z_data(true);
+        uint16_t z_mask = decoder.getTristateValue();
 
         Serial.print("Data: "); Serial.println(data, BIN);
         Serial.print("Z-Mask: "); Serial.println(z_mask, BIN);
 
-        decoder.reset();
+        decoder.resetAvailable();
     }
 }
 ```
