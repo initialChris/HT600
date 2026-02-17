@@ -31,11 +31,12 @@ HT600::HT600(const uint16_t fosc_khz, const float tolerance, const uint16_t tick
     // Pilot period (36T): Minimal LOW duration to identify a new transmission
     // Since the pilot period is 6 bits long and each bit takes up 6T, it lasts 36T
     _pilot_tick_min = uint16_t((T_ticks * 36.0) * (1.0 - tolerance));
+    _pilot_tick_max = uint16_t((T_ticks * 36.0) * (1.0 + tolerance));
 
     // Noise filter threshold in ticks
     _noise_filter_tick = uint16_t(noise_filter_us / tick_length_us);
 
-    this -> reset();
+    this -> resetAvailable();
 }
 
 /**
@@ -45,7 +46,7 @@ HT600::HT600(const uint16_t fosc_khz, const float tolerance, const uint16_t tick
  * * @param pinState The current logical state of the input pin (true/false).
  * @param ticks The current timestamp in ticks (Resolution must match tick_length_us).
  */
-void HT600::processEvent(const bool pinState, const uint32_t ticks) {
+void HT600::handleInterrupt(const bool pinState, const uint32_t ticks) {
     // If the state is DONE, wait until the results are handled by the main loop
     if (_state == HT600_STATE::DONE) return;
 
@@ -70,7 +71,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
     // IDLE State: Looking for the Pilot signal (long LOW pulse) followed by the first SYNC pulse
     if (_state == HT600_STATE::IDLE) {
         // A valid Pilot is a long LOW followed by a SHORT HIGH pulse
-        if (_period_L > _pilot_tick_min && HT600_IS_IN_RANGE(_period_H, _short_tick_min, _short_tick_max)) {
+        if (HT600_IS_IN_RANGE(_period_L, _pilot_tick_min, _pilot_tick_max) && HT600_IS_IN_RANGE(_period_H, _short_tick_min, _short_tick_max)) {
             _state = HT600_STATE::READING; 
             _bit_index = 0;
             
@@ -89,7 +90,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
     else if (HT600_IS_IN_RANGE(_period_L, _long_tick_min, _long_tick_max) && HT600_IS_IN_RANGE(_period_H, _short_tick_min, _short_tick_max)) {
         current_symbol = 1;
     }
-    else if (_period_L > _pilot_tick_min && HT600_IS_IN_RANGE(_period_H, _short_tick_min, _short_tick_max)) {
+    else if (HT600_IS_IN_RANGE(_period_L, _pilot_tick_min, _pilot_tick_max) && HT600_IS_IN_RANGE(_period_H, _short_tick_min, _short_tick_max)) {
         // This is a special case where we might have a new pilot signal in the middle of reading, maybe due to noise or a new transmission starting.
         // Set the state to SYNC_1 and wait for the next transition
         _state = HT600_STATE::READING;
@@ -99,7 +100,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
     }
     else {
         // Bad timing, reset to IDLE and wait for the next transition
-        _state = HT600_STATE::IDLE;
+        this -> resetAvailable();
         return;
     }
 
@@ -120,7 +121,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
                 _bit_index++; // Sync bit valid, proceed
                 return; 
             } else {
-                _state = HT600_STATE::IDLE;
+                this -> resetAvailable();
                 return;
             }
         }
@@ -145,7 +146,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
             _buffer_Z[byte_idx]  |= bit_mask;
         }
         else {
-            _state = HT600_STATE::IDLE;
+            this -> resetAvailable();
             return;
         }
 
@@ -162,7 +163,7 @@ void HT600::processEvent(const bool pinState, const uint32_t ticks) {
  * @param z_mapping_value Logical value to assign if a bit is 'Z'.
  * @return A uint16_t containing the 16 bits of information.
  */
-uint16_t HT600::get_HL_data(bool z_mapping_value) const {
+uint16_t HT600::getReceivedValue(bool z_mapping_value) const {
     uint16_t result = 0;
 
     for (uint8_t i = 0; i < 16; i++) {
@@ -190,7 +191,7 @@ uint16_t HT600::get_HL_data(bool z_mapping_value) const {
  * If false, returns 0 for Z bits and 1 for defined bits (inverted).
  * @return A uint16_t mask representing the trinary 'Open' states.
  */
-uint16_t HT600::get_Z_data(bool z_value) const {
+uint16_t HT600::getTristateValue(bool z_value) const {
     uint16_t result = 0;
 
     for (uint8_t i = 0; i < 16; i++) {
@@ -211,7 +212,7 @@ uint16_t HT600::get_Z_data(bool z_value) const {
     return result;
 }
 
-void HT600::reset() {
+void HT600::resetAvailable() {
     _state = HT600_STATE::IDLE;
     _bit_index = 0;
     _half_symbol_read = false;
@@ -219,10 +220,4 @@ void HT600::reset() {
     _last_interrupt_tick = 0;
     _period_L = 0;
     _period_H = 0;
-
-    // Clear buffers
-    for (int i = 0; i < 3; i++) {
-        _buffer_HL[i] = 0;
-        _buffer_Z[i] = 0;
-    }
 }

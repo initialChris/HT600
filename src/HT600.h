@@ -97,10 +97,10 @@ class HT600 {
         HT600(const uint16_t fosc_khz, const float tolerance, const uint16_t tick_length_us, const uint16_t noise_filter_us);
         const bool available() { return _state == HT600_STATE::DONE; } ;
         const HT600_STATE getState() { return _state; };
-        uint16_t get_HL_data(bool z_value = 0) const;
-        uint16_t get_Z_data (bool z_value = 1) const;
-        void reset();
-        void IRAM_ATTR processEvent(const bool pinState, const uint32_t ticks);
+        uint16_t getReceivedValue(bool z_value = 0) const;
+        uint16_t getTristateValue (bool z_value = 1) const;
+        void resetAvailable();
+        void IRAM_ATTR handleInterrupt(const bool pinState, const uint32_t ticks);
 
     private:
         uint16_t _short_tick_min; 
@@ -108,6 +108,7 @@ class HT600 {
         uint16_t _long_tick_min;  
         uint16_t _long_tick_max; 
         uint16_t _pilot_tick_min;
+        uint16_t _pilot_tick_max;
         uint16_t _noise_filter_tick;
 
         HT600_STATE _state = HT600_STATE::IDLE;
