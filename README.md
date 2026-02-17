@@ -2,7 +2,7 @@
 
 **A lightweight, high-performance, and hardware-agnostic C++ library for decoding trinary RF signals from Holtek HT600, HT680, and HT6207 encoders.**
 
-Designed for efficiency, this library uses a non-blocking Finite State Machine (FSM) approach, making it suitable for resource-constrained microcontrollers. While developed to be cross-platform, it has been specifically tested on **Arduino Duemilanove** and **ATtiny45**.
+While developed to be cross-platform, it has been specifically tested on **Arduino Duemilanove** and **ATtiny45**.
 
 ## Key Features
 
