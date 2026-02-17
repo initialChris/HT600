@@ -8,11 +8,11 @@
  * - "Long"  pulse = 2T
  * - "Pilot" pulse = 36T (Transmission begins with a LOW pulse lasting this interval)
  * * @param fosc_khz The oscillation frequency based on Rosc (use HT680_XXXK_FOSC macros).
- * @param tolerance Percentage of error allowed (e.g., 30 for 30%) Avoid values greater than ~30 to avoid overlapping beetwen short and long pulses timing.
- * @param tick_length_us The resolution of the timestamp source in microseconds (e.g., 1 for micros()).
- * @param noise_filter_us Minimum duration between transitions to filter out noise (e.g., 50 for 50 microseconds).
+ * @param tolerance Percentage of error allowed (e.g., 0.3 for 30%) Avoid values greater than ~0.3 to avoid overlapping beetwen short and long pulses timing.
+ * @param tick_length_us The resolution of the timestamp source in microseconds (e.g., 1.0 for micros()).
+ * @param noise_filter_us Minimum duration between transitions to filter out noise (e.g., 50.0 for 50 microseconds).
  */
-HT600::HT600(const uint16_t fosc_khz, const uint8_t tolerance, const uint16_t tick_length_us, const uint16_t noise_filter_us) {
+HT600::HT600(const uint16_t fosc_khz, const float tolerance, const uint16_t tick_length_us, const uint16_t noise_filter_us) {
     // T (period in microseconds) = 1000 / (fosc_khz / 33) = 33000 / fosc_khz
     float base_period_us = 33000.0 / fosc_khz;
 
@@ -21,16 +21,16 @@ HT600::HT600(const uint16_t fosc_khz, const uint8_t tolerance, const uint16_t ti
 
     // Defining pulse length constraints with tolerance:
     // Short pulse (1T): Used for '0' (H), '1' (L), 'Open' (Both)
-    _short_tick_min = uint16_t(T_ticks * (100 - tolerance) /100);
-    _short_tick_max = uint16_t(T_ticks * (100 + tolerance) /100);
+    _short_tick_min = uint16_t(T_ticks * (1.0 - tolerance));
+    _short_tick_max = uint16_t(T_ticks * (1.0 + tolerance));
 
     // Long pulse (2T): Used for '0' (L), '1' (H)
-    _long_tick_min  = uint16_t((T_ticks * 2.0) * (100 - tolerance) /100);
-    _long_tick_max  = uint16_t((T_ticks * 2.0) * (100 + tolerance) /100);
+    _long_tick_min  = uint16_t((T_ticks * 2.0) * (1.0 - tolerance));
+    _long_tick_max  = uint16_t((T_ticks * 2.0) * (1.0 + tolerance));
 
     // Pilot period (36T): Minimal LOW duration to identify a new transmission
     // Since the pilot period is 6 bits long and each bit takes up 6T, it lasts 36T
-    _pilot_tick_min = uint16_t((T_ticks * 36.0) * (100 - tolerance) /100);
+    _pilot_tick_min = uint16_t((T_ticks * 36.0) * (1.0 - tolerance));
 
     // Noise filter threshold in ticks
     _noise_filter_tick = uint16_t(noise_filter_us / tick_length_us);

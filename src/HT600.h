@@ -94,7 +94,7 @@ enum class HT600_STATE {
 
 class HT600 {
     public:
-        HT600(const uint16_t fosc_khz, const uint8_t tolerance, const uint16_t tick_length_us, const uint16_t noise_filter_us);
+        HT600(const uint16_t fosc_khz, const float tolerance, const uint16_t tick_length_us, const uint16_t noise_filter_us);
         const bool available() { return _state == HT600_STATE::DONE; } ;
         const HT600_STATE getState() { return _state; };
         uint16_t get_HL_data(bool z_value = 0) const;

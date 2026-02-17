@@ -9,7 +9,7 @@
 // 20% of tollerance
 // 1us tick length (so we can use micros() as timestamp)
 // 50us noise filter
-HT600 decoder(HT680_390K_FOSC, 20, 1, 50);
+HT600 decoder(HT680_390K_FOSC, 0.2f, 1, 50);
 
 // Interrupt Service Routine (ISR)
 void IRAM_ATTR handleInterrupt() {
