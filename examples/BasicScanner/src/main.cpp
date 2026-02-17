@@ -15,26 +15,30 @@
 
 // Visual feedback when a valid signal is received
 #define STATUS_LED LED_BUILTIN 
-
+#define REPEAT_TX_RATE 300 //ms
 // --- DECODER SETTINGS ---
 // 1. Oscillator Frequency: 390K resistor -> approx 85kHz (Use macros for other resistors)
-// 2. Tolerance: 20% (0.2f) to account for voltage fluctuations
+// 2. Tolerance: 30% (0.3f) to account for voltage fluctuations
 // 3. Tick Resolution: 1us (matches micros() resolution)
 // 4. Noise Filter: 50us (ignore pulses shorter than this)
-HT600 decoder(HT680_390K_FOSC, 0.2f, 1, 50);
+HT600 decoder(HT680_390K_FOSC, 0.3f, 1, 50);
 
 // --- GLOBAL STATE MANAGEMENT ---
 // Struct to hold the state of the last received packet for debouncing
 struct RxState {
     uint16_t last_data;
     uint32_t last_time;
+    bool active;
+    bool last_active;
+    uint16_t current_data;
+    uint16_t z_mask;
 } rx_state;
 
 // --- INTERRUPT SERVICE ROUTINE (ISR) ---
 // IRAM_ATTR places this function in RAM for faster execution (critical for ESP32)
 void IRAM_ATTR handleInterrupt() {
     // Feed the decoder with the current pin state and timestamp
-    decoder.processEvent(digitalRead(RF_PIN), micros());
+    decoder.handleInterrupt(digitalRead(RF_PIN), micros());
 }
 
 // --- HELPER FUNCTIONS ---
@@ -79,44 +83,50 @@ void setup() {
 }
 
 void loop() {
-    // Check if there is a new decoded packet
+
+    if (millis() - rx_state.last_time > REPEAT_TX_RATE){
+      rx_state.active = false;
+    }
 
     if (decoder.available()) {
-        // Retrieve decoded data and the Z-mask (High-Impedance map)
-        digitalWrite(STATUS_LED, HIGH);
-        uint16_t current_data = decoder.get_HL_data(true); // Map 'Z' bits to '1' (use false to map 'Z' bits to '0')
-        uint16_t z_mask = decoder.get_Z_data(true);         // '1' indicates a 'Z' bit (use false to invert the representation)
-        uint32_t now = millis();
+      // Visual Feedback: Turn LED on
+      digitalWrite(STATUS_LED, HIGH);
 
-        // --- SPAM FILTER / DEBOUNCE ---
-        // Ignore the packet if it's identical to the previous one 
-        // AND received within 500ms.
-        if (current_data == rx_state.last_data && (now - rx_state.last_time < 500)) {
-            decoder.reset();
-            digitalWrite(STATUS_LED, LOW);
-            return;
-        }
+      // Retrieve decoded data and the Z-mask (High-Impedance map)
+      uint16_t current_data = decoder.getReceivedValue(true); // Map 'Z' bits to '1' (use false to map 'Z' bits to '0')
+      uint16_t z_mask = decoder.getTristateValue(true);         // '1' indicates a 'Z' bit (use false to invert the representation)
+      uint32_t now = millis();
 
-        // Update global state
-        rx_state.last_data = current_data;
-        rx_state.last_time = now;
+      // --- SPAM FILTER / DEBOUNCE ---
+      // Ignore the packet if it's identical to the previous one 
+      // AND received within 500ms.
+      rx_state.active = true;
+      rx_state.last_time = now;
+      rx_state.current_data = current_data;
+      rx_state.z_mask = z_mask;
 
-        // Visual Feedback: Turn LED on
-        digitalWrite(STATUS_LED, HIGH);
+      
+      // Reset the FSM to IDLE state to listen for the next pilot signal
+      decoder.resetAvailable();
 
+      // Turn LED off
+      digitalWrite(STATUS_LED, LOW); 
+    }
+
+    if ((rx_state.active != rx_state.last_active) || (rx_state.last_data != rx_state.current_data)){
+      rx_state.last_active = rx_state.active;
+      rx_state.last_data = rx_state.current_data;
+      if (rx_state.active){
         // --- SERIAL OUTPUT ---
         Serial.print(F("[RECV] Raw Bin:  "));
-        printFormatted(current_data, 0, false);
-        
-        Serial.print(F(" | Tristate: "));
-        printFormatted(current_data, z_mask, true);
-        
-        Serial.println(); // New line
-        
-        // Reset the FSM to IDLE state to listen for the next pilot signal
-        decoder.reset();
-
-        // Turn LED off
-        digitalWrite(STATUS_LED, LOW); 
+        printFormatted(rx_state.current_data, 0, false);
+        Serial.print(F(" (0x"));
+        Serial.print(rx_state.current_data, HEX);
+        Serial.print(F(") | Tristate: "));
+        printFormatted(rx_state.current_data, rx_state.z_mask, true);
+        Serial.print(F(" (0x"));
+        Serial.print(rx_state.z_mask, HEX);
+        Serial.println(F(")"));
+      }
     }
 }
